@@ -2,7 +2,7 @@
 
 ## Abstract
 
-The Ubiquiti Store checks availability and notifies you by email when the status changes.
+This program checks the availability of items in the Ubiquiti Store and notifies you by email when the status changes.
 
 ## Configuration File
 

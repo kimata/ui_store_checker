@@ -1,0 +1,11 @@
+# Ubiquiti login
+login:
+  user: 
+  pass: 
+
+# SMTP server login and mailing address
+mail:
+  user: 
+  pass: 
+  from: 
+  to: 

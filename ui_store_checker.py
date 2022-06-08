@@ -226,7 +226,7 @@ try:
                 memory_total=mem_info["total"], memory_js_heap=mem_info["js_heap"]
             )
         )
-        time.sleep(60 * 60)  # sleep 1 hour
+        time.sleep(10 * 60)  # sleep 10min
 except:
     logging.error("URL: {url}".format(url=driver.current_url))
     logging.error(traceback.format_exc())

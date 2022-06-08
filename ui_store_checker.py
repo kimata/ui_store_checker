@@ -174,7 +174,7 @@ def do_stock_check(driver, wait, item):
     if is_in_stock:
         logging.info("{name} is in stock!".format(name=item["name"]))
     else:
-        logging.info("{name} is out of stock...".format(name=item["name"]))
+        logging.warn("{name} is out of stock...".format(name=item["name"]))
 
     return is_in_stock
 

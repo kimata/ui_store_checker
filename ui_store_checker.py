@@ -20,7 +20,9 @@ import random
 import yaml
 import pprint
 import pathlib
+import datetime
 import traceback
+import csv
 
 import notifier
 
@@ -37,6 +39,7 @@ LOG_PATH = "log"
 LOG_FORMAT = (
     "%(asctime)s %(levelname)s [%(filename)s:%(lineno)s %(funcName)s] %(message)s"
 )
+HISTORY_CSV = "history.csv"
 
 
 class GZipRotator:
@@ -179,6 +182,42 @@ def do_stock_check(driver, wait, item):
     return is_in_stock
 
 
+def write_histstory(in_stock_now, in_stock_before):
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9), "JST"))
+    date_time = [now.strftime("%Y/%m/%d/"), now.strftime("%H:%M")]
+    with open(HISTORY_CSV, "aw") as f:
+        writer = csv.writer(f)
+        for item_name in in_stock_now:
+            if (item_name in in_stock_before) and (
+                in_stock_before[item_name] != in_stock_now[item_name]
+            ):
+                writer.writerow(
+                    [
+                        date_time[0],
+                        date_time[1],
+                        item_name,
+                        "OK" if in_stock_now[item_name] else "NG",
+                    ]
+                )
+
+
+def notify(config, in_stock_now):
+    notifier.send(
+        config,
+        "Inventory status has changed.<br />\n{item_list}".format(
+            item_list="<br />\n".join(
+                map(
+                    lambda item: "- {name}: {status}".format(
+                        name=item["name"],
+                        status="<b>OK</b>" if in_stock_now[item["name"]] else "NG",
+                    ),
+                    config["target"],
+                )
+            )
+        ),
+    )
+
+
 os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
 
 logger_init()
@@ -203,22 +242,8 @@ try:
             time.sleep(5)
 
         if (len(in_stock_before) != 0) and (in_stock_now != in_stock_before):
-            notifier.send(
-                config,
-                "Inventory status has changed.<br />\n{item_list}".format(
-                    item_list="<br />\n".join(
-                        map(
-                            lambda item: "- {name}: {status}".format(
-                                name=item["name"],
-                                status="<b>OK</b>"
-                                if in_stock_now[item["name"]]
-                                else "NG",
-                            ),
-                            config["target"],
-                        )
-                    )
-                ),
-            )
+            write_histstory(in_stock_now, in_stock_before)
+            notify(config, in_stock_now)
 
         mem_info = get_memory_info(driver)
         logging.info(

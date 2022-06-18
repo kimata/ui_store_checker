@@ -56,7 +56,7 @@ class GZipRotator:
 def logger_init():
     coloredlogs.install(fmt=LOG_FORMAT)
 
-    log_path = pathlib.Path(LOG_PATH)
+    log_path = pathlib.Path(os.path.dirname(__file__), LOG_PATH)
     os.makedirs(str(log_path), exist_ok=True)
 
     logger = logging.getLogger()
@@ -106,7 +106,7 @@ def get_memory_info(driver):
 
 def dump_page(driver, index):
     name = inspect.stack()[1].function.replace("<", "").replace(">", "")
-    dump_path = pathlib.Path(DUMP_PATH)
+    dump_path = pathlib.Path(os.path.dirname(__file__), DUMP_PATH)
 
     os.makedirs(str(dump_path), exist_ok=True)
 
@@ -185,7 +185,7 @@ def do_stock_check(driver, wait, item):
 def write_histstory(in_stock_now, in_stock_before):
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9), "JST"))
     date_time = [now.strftime("%Y/%m/%d/"), now.strftime("%H:%M")]
-    with open(HISTORY_CSV, "aw") as f:
+    with open(get_abs_path(HISTORY_CSV), "aw") as f:
         writer = csv.writer(f)
         for item_name in in_stock_now:
             if (item_name in in_stock_before) and (

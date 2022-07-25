@@ -1,0 +1,11 @@
+version: "2"
+
+services:
+  ubiquiti:
+    build:
+      context: "."
+    volumes:
+      - "./chrome_data:/opt/store_checker/chrome_data"
+      - "./log:/opt/store_checker/log"
+      - "./debug:/opt/store_checker/debug"
+    restart: always

@@ -11,11 +11,17 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.chrome.options import Options
+
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.core.utils import ChromeType
+
 from selenium.webdriver.support import expected_conditions as EC
 import time
 import os
 import sys
 import random
+import shutil
 
 import yaml
 import pprint
@@ -39,7 +45,7 @@ LOG_PATH = "log"
 LOG_FORMAT = (
     "%(asctime)s %(levelname)s [%(filename)s:%(lineno)s %(funcName)s] %(message)s"
 )
-HISTORY_CSV = "history.csv"
+HISTORY_CSV = LOG_PATH + "/history.csv"
 
 
 class GZipRotator:
@@ -153,16 +159,31 @@ def do_login(driver, wait, config):
 def create_driver():
     options = Options()
     options.add_argument("--headless")
+    options.add_argument("--no-sandbox")  # for Docker
+    options.add_argument("--disable-dev-shm-usage")  # for Docker
+
     options.add_argument("--lang=ja-JP")
     options.add_argument("--window-size=1920,1080")
-    options.add_argument(
-        '--user-agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36"'
-    )
+
     options.add_argument("--user-data-dir=" + get_abs_path(CHROME_DATA_PATH))
 
-    import chromedriver_binary
+    # NOTE: 下記がないと，snap で入れた chromium が「LC_ALL: cannot change locale (ja_JP.UTF-8)」
+    # と出力し，その結果 ChromeDriverManager がバージョンを正しく取得できなくなる
+    os.environ["LC_ALL"] = "C"
 
-    driver = webdriver.Chrome(options=options)
+    if shutil.which("google-chrome") is not None:
+        chrome_type = ChromeType.GOOGLE
+    else:
+        chrome_type = ChromeType.CHROMIUM
+
+    driver = webdriver.Chrome(
+        service=Service(
+            ChromeDriverManager(chrome_type=chrome_type).install(),
+            log_path="log/webdriver.log",
+            service_args=["--verbose"],
+        ),
+        options=options,
+    )
 
     return driver
 
@@ -177,7 +198,7 @@ def do_stock_check(driver, wait, item):
     if is_in_stock:
         logging.info("{name} is in stock!".format(name=item["name"]))
     else:
-        logging.warn("{name} is out of stock...".format(name=item["name"]))
+        logging.warning("{name} is out of stock...".format(name=item["name"]))
 
     return is_in_stock
 
@@ -185,7 +206,7 @@ def do_stock_check(driver, wait, item):
 def write_histstory(in_stock_now, in_stock_before):
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9), "JST"))
     date_time = [now.strftime("%Y/%m/%d/"), now.strftime("%H:%M")]
-    with open(get_abs_path(HISTORY_CSV), "aw") as f:
+    with open(get_abs_path(HISTORY_CSV), "a") as f:
         writer = csv.writer(f)
         for item_name in in_stock_now:
             if (item_name in in_stock_before) and (
@@ -251,7 +272,7 @@ try:
                 memory_total=mem_info["total"], memory_js_heap=mem_info["js_heap"]
             )
         )
-        time.sleep(10 * 60)  # sleep 10min
+        time.sleep(5 * 60)  # sleep 5min
 except:
     logging.error("URL: {url}".format(url=driver.current_url))
     logging.error(traceback.format_exc())

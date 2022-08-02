@@ -1,0 +1,17 @@
+# Ubiquiti login
+login:
+  user:
+  pass:
+
+# SMTP server login and mailing address
+mail:
+  user:
+  pass:
+  from:
+  to:
+
+check:
+  interval: 300
+
+liveness:
+  file: /dev/shm/healthz

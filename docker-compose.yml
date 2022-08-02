@@ -5,7 +5,5 @@ services:
     build:
       context: "."
     volumes:
-      - "./chrome_data:/opt/store_checker/chrome_data"
-      - "./log:/opt/store_checker/log"
-      - "./debug:/opt/store_checker/debug"
+      - "./data:/opt/store_checker/data"
     restart: always

@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # - coding: utf-8 --
-import coloredlogs
 import logging
 import logging.handlers
-import bz2
 import inspect
 import subprocess
 
@@ -23,78 +21,28 @@ import sys
 import random
 import shutil
 
-import yaml
-import pprint
 import pathlib
 import datetime
 import traceback
 import csv
 
+import logger
 import notifier
+from config import load_config
 
-CONFIG_LOGIN_PATH = "config.yaml"
-CONFIG_TARGET_PATH = "target.yaml"
+CONFIG_TARGET_PATH = "../target.yaml"
 
 LOGIN_URL = "https://sso.ui.com/api/sso/v1/shopify_login"
 
 
-CHROME_DATA_PATH = "chrome_data"
-DUMP_PATH = "debug"
-DATA_PATH = "data"
-LOG_PATH = "log"
-LOG_FORMAT = (
-    "%(asctime)s %(levelname)s [%(filename)s:%(lineno)s %(funcName)s] %(message)s"
-)
-HISTORY_CSV = LOG_PATH + "/history.csv"
+DATA_PATH = pathlib.Path(os.path.dirname(__file__)).parent / "data"
+LOG_PATH = DATA_PATH / "log"
 
+CHROME_PATH = str(DATA_PATH / "chrome")
+DUMP_PATH = str(DATA_PATH / "deubg")
 
-class GZipRotator:
-    def namer(name):
-        return name + ".bz2"
-
-    def rotator(source, dest):
-        with open(source, "rb") as fs:
-            with bz2.open(dest, "wb") as fd:
-                fd.writelines(fs)
-        os.remove(source)
-
-
-def logger_init():
-    coloredlogs.install(fmt=LOG_FORMAT)
-
-    log_path = pathlib.Path(os.path.dirname(__file__), LOG_PATH)
-    os.makedirs(str(log_path), exist_ok=True)
-
-    logger = logging.getLogger()
-    log_handler = logging.handlers.RotatingFileHandler(
-        str(log_path / "ui_store_checker.log"),
-        encoding="utf8",
-        maxBytes=1 * 1024 * 1024,
-        backupCount=10,
-    )
-    log_handler.formatter = logging.Formatter(
-        fmt=LOG_FORMAT, datefmt="%Y-%m-%d %H:%M:%S"
-    )
-    log_handler.namer = GZipRotator.namer
-    log_handler.rotator = GZipRotator.rotator
-
-    logger.addHandler(log_handler)
-
-
-def get_abs_path(path):
-    return str(pathlib.Path(os.path.dirname(__file__), path))
-
-
-def load_config():
-    config = {}
-
-    with open(get_abs_path(CONFIG_LOGIN_PATH)) as file:
-        config.update(yaml.safe_load(file))
-
-    with open(get_abs_path(CONFIG_TARGET_PATH)) as file:
-        config["target"] = yaml.safe_load(file)
-
-    return config
+DRIVER_LOG_PATH = str(LOG_PATH / "webdriver.log")
+HIST_CSV_PATH = str(LOG_PATH / "history.csv")
 
 
 def get_memory_info(driver):
@@ -165,7 +113,7 @@ def create_driver():
     options.add_argument("--lang=ja-JP")
     options.add_argument("--window-size=1920,1080")
 
-    options.add_argument("--user-data-dir=" + get_abs_path(CHROME_DATA_PATH))
+    options.add_argument("--user-data-dir=" + CHROME_PATH)
 
     # NOTE: 下記がないと，snap で入れた chromium が「LC_ALL: cannot change locale (ja_JP.UTF-8)」
     # と出力し，その結果 ChromeDriverManager がバージョンを正しく取得できなくなる
@@ -179,7 +127,7 @@ def create_driver():
     driver = webdriver.Chrome(
         service=Service(
             ChromeDriverManager(chrome_type=chrome_type).install(),
-            log_path="log/webdriver.log",
+            log_path=DRIVER_LOG_PATH,
             service_args=["--verbose"],
         ),
         options=options,
@@ -198,7 +146,7 @@ def do_stock_check(driver, wait, item):
     if is_in_stock:
         logging.info("{name} is in stock!".format(name=item["name"]))
     else:
-        logging.warning("{name} is out of stock...".format(name=item["name"]))
+        logging.info("{name} is out of stock...".format(name=item["name"]))
 
     return is_in_stock
 
@@ -206,7 +154,7 @@ def do_stock_check(driver, wait, item):
 def write_histstory(in_stock_now, in_stock_before):
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9), "JST"))
     date_time = [now.strftime("%Y/%m/%d/"), now.strftime("%H:%M")]
-    with open(get_abs_path(HISTORY_CSV), "a") as f:
+    with open(HIST_CSV_PATH, "a") as f:
         writer = csv.writer(f)
         for item_name in in_stock_now:
             if (item_name in in_stock_before) and (
@@ -241,10 +189,7 @@ def notify(config, in_stock_now):
 
 os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
 
-logger_init()
-
-logging.info("開始します．")
-
+logger.init("Ubiquiti Store Checker")
 
 driver = create_driver()
 wait = WebDriverWait(driver, 5)
@@ -252,10 +197,12 @@ wait = WebDriverWait(driver, 5)
 in_stock_now = {}
 try:
     while True:
+        logging.info("Start.")
         in_stock_before = in_stock_now
         in_stock_now = {}
 
         config = load_config()
+        config["target"] = load_config(CONFIG_TARGET_PATH)
         do_login(driver, wait, config)
 
         for item in config["target"]:
@@ -266,13 +213,18 @@ try:
             write_histstory(in_stock_now, in_stock_before)
             notify(config, in_stock_now)
 
+        logging.info("Finish.")
+        pathlib.Path(config["liveness"]["file"]).touch()
+
         mem_info = get_memory_info(driver)
         logging.info(
             "Chrome memory: {memory_total:,} MB (JS: {memory_js_heap:,} MB)".format(
                 memory_total=mem_info["total"], memory_js_heap=mem_info["js_heap"]
             )
         )
-        time.sleep(5 * 60)  # sleep 5min
+
+        sleep_time = config["check"]["interval"] - datetime.datetime.now().second
+        logging.info("sleep {sleep_time} sec...".format(sleep_time=sleep_time))
 except:
     logging.error("URL: {url}".format(url=driver.current_url))
     logging.error(traceback.format_exc())
@@ -281,4 +233,4 @@ except:
 driver.close()
 driver.quit()
 
-logging.info("完了しました．")
+sys.exit(-1)

@@ -23,4 +23,4 @@ USER ubuntu
 
 COPY --chown=ubuntu . .
 
-CMD ["./ui_store_checker.py"]
+CMD ["./src/ui_store_checker.py"]

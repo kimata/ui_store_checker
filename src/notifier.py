@@ -45,9 +45,8 @@ def send(config, message):
 
 
 if __name__ == "__main__":
-    import yaml
+    from config import load_config
 
-    with open(str(pathlib.Path(os.path.dirname(__file__), "config.yaml"))) as file:
-        config = yaml.safe_load(file)
+    config = load_config()
 
     send(config, "Testです")

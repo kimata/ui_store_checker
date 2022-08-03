@@ -38,7 +38,7 @@ LOGIN_URL = "https://sso.ui.com/api/sso/v1/shopify_login"
 DATA_PATH = pathlib.Path(os.path.dirname(__file__)).parent / "data"
 LOG_PATH = DATA_PATH / "log"
 
-CHROME_PATH = str(DATA_PATH / "chrome")
+CHROME_DATA_PATH = str(DATA_PATH / "chrome")
 DUMP_PATH = str(DATA_PATH / "deubg")
 
 DRIVER_LOG_PATH = str(LOG_PATH / "webdriver.log")
@@ -113,7 +113,7 @@ def create_driver():
     options.add_argument("--lang=ja-JP")
     options.add_argument("--window-size=1920,1080")
 
-    options.add_argument("--user-data-dir=" + CHROME_PATH)
+    options.add_argument("--user-data-dir=" + CHROME_DATA_PATH)
 
     # NOTE: 下記がないと，snap で入れた chromium が「LC_ALL: cannot change locale (ja_JP.UTF-8)」
     # と出力し，その結果 ChromeDriverManager がバージョンを正しく取得できなくなる

@@ -225,6 +225,7 @@ try:
 
         sleep_time = config["check"]["interval"] - datetime.datetime.now().second
         logging.info("sleep {sleep_time} sec...".format(sleep_time=sleep_time))
+        time.sleep(sleep_time)
 except:
     logging.error("URL: {url}".format(url=driver.current_url))
     logging.error(traceback.format_exc())

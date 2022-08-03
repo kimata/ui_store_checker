@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os
 import time
 import smtplib
 import pathlib
@@ -11,7 +10,7 @@ import logging
 INTERVAL_MIN = 60 * 8
 
 STAT_DIR_PATH = pathlib.Path("/dev/shm")
-STAT_PATH_NOTIFY = STAT_DIR_PATH / "ui_store_notify"
+STAT_PATH_NOTIFY = STAT_DIR_PATH / "notify_mail"
 
 
 def send_impl(config, message):
@@ -20,7 +19,7 @@ def send_impl(config, message):
     smtp.login(config["mail"]["user"], config["mail"]["pass"])
 
     msg = MIMEText(message, "html")
-    msg["Subject"] = "Ubiquiti Store Checker"
+    msg["Subject"] = config["mail"]["subject"]
     msg["To"] = config["mail"]["to"]
     msg["From"] = config["mail"]["from"]
 

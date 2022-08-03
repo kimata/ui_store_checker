@@ -9,6 +9,7 @@ mail:
   pass:
   from:
   to:
+  subject:
 
 check:
   interval: 300

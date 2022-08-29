@@ -189,7 +189,7 @@ def notify(config, in_stock_now):
 
 os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
 
-logger.init("Ubiquiti Store Checker")
+logger.init("bot.ui_store.checker")
 
 driver = create_driver()
 wait = WebDriverWait(driver, 5)

@@ -25,6 +25,7 @@ import pathlib
 import datetime
 import traceback
 import csv
+import pickle
 
 import logger
 import notifier
@@ -43,6 +44,28 @@ DUMP_PATH = str(DATA_PATH / "deubg")
 
 DRIVER_LOG_PATH = str(LOG_PATH / "webdriver.log")
 HIST_CSV_PATH = str(LOG_PATH / "history.csv")
+STOCK_CACHE_PATH = str(LOG_PATH / "stock_cache.dat")
+
+
+def serialize_load(path, init={}):
+    if pathlib.Path(path).exists():
+        with open(path, "rb") as f:
+            return pickle.load(f)
+    else:
+        return init
+
+
+def serialize_store(path, cache):
+    with open(path, "wb") as f:
+        pickle.dump(cache, f)
+
+
+def stock_cache_load():
+    return serialize_load(STOCK_CACHE_PATH, {})
+
+
+def stock_cache_store(stock_cache):
+    return serialize_store(STOCK_CACHE_PATH, stock_cache)
 
 
 def get_memory_info(driver):
@@ -136,17 +159,19 @@ def create_driver():
     return driver
 
 
-def do_stock_check(driver, wait, item):
+def do_stock_check(driver, wait, item, before_stock):
     driver.get(item["url"])
     wait.until(EC.presence_of_element_located((By.XPATH, "//body")))
 
     is_in_stock = (
         len(driver.find_elements(By.XPATH, '//span[@id="titleInStockBadge"]')) != 0
     )
-    if is_in_stock:
-        logging.info("{name} is in stock!".format(name=item["name"]))
-    else:
-        logging.info("{name} is out of stock...".format(name=item["name"]))
+    logging.info("check {name}".format(name=item["name"]))
+    if is_in_stock != before_stock:
+        if is_in_stock:
+            logging.info("{name} is in stock!".format(name=item["name"]))
+        else:
+            logging.info("{name} is out of stock...".format(name=item["name"]))
 
     return is_in_stock
 
@@ -194,7 +219,7 @@ logger.init("bot.ui_store.checker")
 driver = create_driver()
 wait = WebDriverWait(driver, 5)
 
-in_stock_now = {}
+in_stock_now = stock_cache_load()
 try:
     while True:
         logging.info("Start.")
@@ -206,12 +231,21 @@ try:
         do_login(driver, wait, config)
 
         for item in config["target"]:
-            in_stock_now[item["name"]] = do_stock_check(driver, wait, item)
+            in_stock_now[item["name"]] = do_stock_check(
+                driver,
+                wait,
+                item,
+                in_stock_before[item["name"]]
+                if item["name"] in in_stock_before
+                else False,
+            )
             time.sleep(5)
 
         if (len(in_stock_before) != 0) and (in_stock_now != in_stock_before):
             write_histstory(in_stock_now, in_stock_before)
             notify(config, in_stock_now)
+
+        stock_cache_store(in_stock_now)
 
         logging.info("Finish.")
         pathlib.Path(config["liveness"]["file"]).touch()
